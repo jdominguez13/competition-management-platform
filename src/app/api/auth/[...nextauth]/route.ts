@@ -1,13 +1,10 @@
 import NextAuth from 'next-auth'
 import CredentialsProvider from 'next-auth/providers/credentials'
-import { PrismaAdapter } from '@auth/prisma-adapter'
 import { PrismaClient } from '@prisma/client'
-import bcrypt from 'bcryptjs'
 
 const prisma = new PrismaClient()
 
 const handler = NextAuth({
-  adapter: PrismaAdapter(prisma),
   providers: [
     CredentialsProvider({
       name: 'credentials',
@@ -28,10 +25,8 @@ const handler = NextAuth({
           return null
         }
 
-        // For now, we'll do a simple password check
-        // In production, you'd hash passwords with bcrypt
-        const isValidPassword = credentials.password === 'password123' || 
-          (user.emailVerified && await bcrypt.compare(credentials.password, user.name || ''))
+        // Simple password check for demo
+        const isValidPassword = credentials.password === 'password123'
 
         if (!isValidPassword) {
           return null
@@ -41,7 +36,7 @@ const handler = NextAuth({
           id: user.id,
           email: user.email,
           name: user.name,
-          role: user.role as string,
+          role: user.role,
         }
       }
     })
@@ -50,26 +45,26 @@ const handler = NextAuth({
     strategy: 'jwt',
   },
   callbacks: {
-    async jwt({ token, user }: any) {
+    async jwt({ token, user }) {
       if (user) {
         token.role = user.role
       }
       return token
     },
-    async session({ session, token }: any) {
+    async session({ session, token }) {
       return {
         ...session,
         user: {
-          ...session.user,
-          id: token.sub,
-          role: token.role
+          id: token.sub || '',
+          email: session.user?.email || '',
+          name: session.user?.name || '',
+          role: token.role || 'SKATER'
         }
       }
     },
   },
   pages: {
     signIn: '/auth/signin',
-    signUp: '/auth/signup',
   },
 })
 
