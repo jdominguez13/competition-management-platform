@@ -48,8 +48,16 @@ const settingsSchema = z.object({
   maxEntries: z.string().optional().transform((val) => val ? parseInt(val) : undefined),
 })
 
+// Form input types (before transformation)
+const settingsFormSchema = z.object({
+  status: z.enum(['DRAFT', 'PUBLISHED']).default('DRAFT'),
+  entryFee: z.string(),
+  maxEntries: z.string().optional(),
+})
+
 type BasicInfoData = z.infer<typeof basicInfoSchema>
 type SettingsData = z.infer<typeof settingsSchema>
+type SettingsFormData = z.infer<typeof settingsFormSchema>
 
 type CompetitionData = BasicInfoData & SettingsData & {
   organizerId: string
@@ -81,8 +89,8 @@ export default function NewCompetitionPage() {
   })
 
   // Form for step 2 - Settings
-  const settingsForm = useForm<SettingsData>({
-    resolver: zodResolver(settingsSchema),
+  const settingsForm = useForm<SettingsFormData>({
+    resolver: zodResolver(settingsFormSchema),
     defaultValues: {
       status: 'DRAFT',
       entryFee: '0',
@@ -103,8 +111,14 @@ export default function NewCompetitionPage() {
     setCurrentStep(2)
   }
 
-  const handleStep2Submit = (data: SettingsData) => {
-    setCompetitionData(prev => ({ ...prev, ...data }))
+  const handleStep2Submit = (data: SettingsFormData) => {
+    // Transform form data to the proper types
+    const transformedData: SettingsData = {
+      status: data.status,
+      entryFee: parseFloat(data.entryFee),
+      maxEntries: data.maxEntries ? parseInt(data.maxEntries) : undefined,
+    }
+    setCompetitionData(prev => ({ ...prev, ...transformedData }))
     setCurrentStep(3)
   }
 
