@@ -11,8 +11,8 @@ interface Event {
   name: string
   description?: string
   category: string
-  level: string
-  ageGroup: string
+  level?: string
+  ageGroup?: string
   entryFee: number
   earlyBirdFee?: number
   maxParticipants?: number
@@ -117,15 +117,19 @@ export function EventCard({
 
       <CardContent>
         <div className="space-y-3">
-          <div className="flex justify-between text-sm">
-            <span className="text-muted-foreground">Level:</span>
-            <span className="font-medium">{event.level}</span>
-          </div>
+          {event.level && (
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Level:</span>
+              <span className="font-medium">{event.level}</span>
+            </div>
+          )}
           
-          <div className="flex justify-between text-sm">
-            <span className="text-muted-foreground">Age Group:</span>
-            <span className="font-medium">{event.ageGroup}</span>
-          </div>
+          {event.ageGroup && (
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Age Group:</span>
+              <span className="font-medium">{event.ageGroup}</span>
+            </div>
+          )}
           
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">Entry Fee:</span>
