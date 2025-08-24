@@ -975,4 +975,291 @@ If authentication isn't working:
 
 ---
 
-**Status:** This guide provides the foundation for Phase 1 implementation. Each step builds upon the previous one, creating a solid foundation for the figure skating competition platform.
+# Phase 3: Production Deployment & Demo Setup
+
+**Objective:** Deploy the platform to Vercel with production database and demo data for prospective buyers.
+
+## Step 1: Prepare for Deployment
+
+### 1.1 Review Authentication Configuration
+```bash
+# Check NextAuth configuration
+cat src/app/api/auth/[...nextauth]/route.ts
+```
+
+### 1.2 Verify UI Components
+Ensure all custom components are properly typed and working:
+- Event forms with proper validation
+- Competition creation wizard
+- Registration workflows
+- Dashboard layouts
+
+## Step 2: Fix Type Compatibility Issues
+
+### 2.1 Resolve Event Interface Conflicts
+**Problem:** Multiple Event interfaces with incompatible types.
+**Solution:** Update EventCard component to handle optional fields.
+
+```typescript
+// In src/components/ui/event-card.tsx
+interface Event {
+  id: string
+  name: string
+  description?: string
+  category: string
+  level?: string        // Make optional
+  ageGroup?: string     // Make optional
+  entryFee: number
+  // ... other fields
+}
+
+// Add conditional rendering for optional fields
+{event.level && (
+  <div className="flex justify-between text-sm">
+    <span className="text-muted-foreground">Level:</span>
+    <span className="font-medium">{event.level}</span>
+  </div>
+)}
+```
+
+### 2.2 Fix React Hook Form + Zod Type Mismatches
+**Problem:** Zod `.transform()` creates type incompatibility with useForm.
+**Solution:** Create separate form schemas for input and output types.
+
+```typescript
+// Create separate schemas
+const eventSchema = z.object({
+  // ... with transforms
+  entryFee: z.string().transform((val) => parseFloat(val)).pipe(z.number().min(0)),
+})
+
+const eventFormSchema = z.object({
+  // ... without transforms for form input
+  entryFee: z.string(),
+})
+
+type EventData = z.infer<typeof eventSchema>
+type EventFormData = z.infer<typeof eventFormSchema>
+
+// Use form schema for useForm
+const form = useForm<EventFormData>({
+  resolver: zodResolver(eventFormSchema),
+})
+
+// Transform in submit handler
+const onSubmit = async (data: EventFormData) => {
+  const transformedData: EventData = {
+    ...data,
+    entryFee: parseFloat(data.entryFee),
+  }
+}
+```
+
+### 2.3 Fix Suspense Boundary Issues
+**Problem:** `useSearchParams()` needs Suspense boundary for SSG.
+**Solution:** Wrap client-side hooks in Suspense.
+
+```typescript
+// In src/app/auth/signin/page.tsx
+function SignInForm() {
+  const searchParams = useSearchParams()
+  // ... component logic
+}
+
+export default function SignInPage() {
+  return (
+    <Suspense fallback={<LoadingSpinner />}>
+      <SignInForm />
+    </Suspense>
+  )
+}
+```
+
+## Step 3: Set Up Production Database
+
+### 3.1 Create Production Database
+**Railway (Recommended):**
+1. Go to [railway.app](https://railway.app)
+2. Sign up with GitHub
+3. Create new project → Provision PostgreSQL
+4. Copy database URL from Connect tab
+
+**Alternative - Supabase:**
+1. Go to [supabase.com](https://supabase.com)
+2. Create new project
+3. Copy database URL from Settings → Database
+
+### 3.2 Update Database Configuration
+```bash
+# Update prisma/schema.prisma
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+```
+
+### 3.3 Create Database Seed Script
+```typescript
+// Create prisma/seed.ts
+import { PrismaClient } from '@prisma/client'
+
+const prisma = new PrismaClient()
+
+async function main() {
+  // Create demo users
+  const organizer = await prisma.user.upsert({
+    where: { email: 'sarah@example.com' },
+    update: {},
+    create: {
+      email: 'sarah@example.com',
+      name: 'Sarah Johnson',
+      role: 'ORGANIZER',
+    },
+  })
+
+  // Create demo competition and events
+  // ... (full seed data)
+}
+```
+
+```bash
+# Add to package.json
+"scripts": {
+  "db:seed": "tsx prisma/seed.ts",
+  "postinstall": "prisma generate"
+}
+
+# Install tsx for TypeScript execution
+npm install --save-dev tsx
+```
+
+## Step 4: Deploy to Vercel
+
+### 4.1 Connect GitHub Repository
+1. Push all changes to GitHub
+2. Go to [vercel.com](https://vercel.com)
+3. Import your GitHub repository
+4. Configure build settings (auto-detected)
+
+### 4.2 Configure Environment Variables
+In Vercel Dashboard → Project → Settings → Environment Variables:
+
+```bash
+DATABASE_URL=postgresql://user:password@host:port/database
+NEXTAUTH_SECRET=your-32-character-random-secret
+NEXTAUTH_URL=https://your-app.vercel.app
+```
+
+### 4.3 Deploy and Troubleshoot
+Common deployment issues and fixes:
+
+**Prisma Client Generation:**
+```bash
+# Add to package.json scripts
+"postinstall": "prisma generate"
+```
+
+**Type Errors in Production:**
+- Ensure all TypeScript errors are resolved locally first
+- Check build logs for specific error messages
+- Fix type mismatches between form inputs and schemas
+
+## Step 5: Set Up Demo Database
+
+### 5.1 Push Schema and Seed Data
+```bash
+# Configure local .env with production database URL
+DATABASE_URL="your-production-database-url"
+NEXTAUTH_SECRET="your-secret"
+NEXTAUTH_URL="https://your-app.vercel.app"
+
+# Push schema to production database
+npx prisma db push
+
+# Seed with demo data
+npm run db:seed
+```
+
+### 5.2 Verify Demo Data
+The seed script creates:
+- **Organizer:** sarah@example.com / password123
+- **Skaters:** emma@example.com, michael@example.com / password123  
+- **Coach:** coach@example.com / password123
+- **Sample Competition:** "Spring Figure Skating Championship 2025"
+- **3 Events:** Adult Bronze Freestyle, Juvenile Ladies, Pre-Alpha Moves
+- **Sample Registrations:** 2 existing registrations to show functionality
+
+## Step 6: Prepare Demo for Buyers
+
+### 6.1 Demo Flow Documentation
+**For Organizers:**
+1. Sign in as sarah@example.com
+2. View dashboard with real statistics
+3. Create new competition using wizard
+4. Add events to competition
+5. View and manage registrations
+
+**For Skaters:**
+1. Sign in as emma@example.com
+2. Browse available competitions
+3. View event details and requirements
+4. Register for events
+5. View confirmation
+
+### 6.2 Key Selling Points
+- ✅ Modern, professional UI/UX
+- ✅ Complete competition workflow
+- ✅ Role-based authentication
+- ✅ Real-time registration management
+- ✅ Mobile responsive design
+- ✅ Production-ready deployment
+
+## Step 7: Deployment Checklist
+
+- [ ] All TypeScript errors resolved
+- [ ] React Hook Form schemas properly typed
+- [ ] Suspense boundaries added where needed
+- [ ] Prisma client generation configured
+- [ ] Production database connected
+- [ ] Demo data seeded successfully
+- [ ] Environment variables configured
+- [ ] Vercel deployment successful
+- [ ] Authentication working with demo accounts
+- [ ] All major workflows tested
+
+---
+
+## Deployment Troubleshooting
+
+### TypeScript Build Errors
+**Event Interface Conflicts:**
+- Make optional fields consistent across interfaces
+- Add conditional rendering for optional properties
+
+**Zod Transform Type Issues:**
+- Create separate form and data schemas
+- Transform data in submit handlers, not in form declarations
+
+**Missing Suspense Boundaries:**
+- Wrap client-side navigation hooks in Suspense
+- Add loading fallbacks for better UX
+
+### Database Issues
+**Connection Problems:**
+- Verify DATABASE_URL format and credentials
+- Ensure database provider matches schema
+- Check firewall/network access to database
+
+**Migration Issues:**
+- Use `prisma db push` for development/prototype databases
+- Ensure schema changes are compatible with existing data
+
+### Authentication Issues
+**NextAuth Configuration:**
+- Verify NEXTAUTH_SECRET is properly set
+- Ensure NEXTAUTH_URL matches deployment URL
+- Check authentication provider configuration
+
+---
+
+**Status:** Phase 3 complete. The platform is now deployed to production with a working demo ready for prospective buyers. All major functionality has been tested and verified working in the production environment.
