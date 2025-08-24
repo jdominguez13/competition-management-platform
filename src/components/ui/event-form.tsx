@@ -26,7 +26,22 @@ const eventSchema = z.object({
   endTime: z.string().optional(),
 })
 
-type EventFormData = z.infer<typeof eventSchema>
+// Form input schema (before transformation)
+const eventFormSchema = z.object({
+  name: z.string().min(1, 'Event name is required').max(100, 'Name too long'),
+  category: z.string().min(1, 'Category is required'),
+  ageGroup: z.string().optional(),
+  level: z.string().optional(),
+  entryFee: z.string(),
+  maxEntries: z.string().optional(),
+  description: z.string().optional(),
+  requirements: z.string().optional(),
+  startTime: z.string().optional(),
+  endTime: z.string().optional(),
+})
+
+type EventData = z.infer<typeof eventSchema>
+type EventFormData = z.infer<typeof eventFormSchema>
 
 interface EventFormProps {
   competitionId: string
@@ -86,7 +101,7 @@ export function EventForm({ competitionId, onEventCreated }: EventFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const form = useForm<EventFormData>({
-    resolver: zodResolver(eventSchema),
+    resolver: zodResolver(eventFormSchema),
     defaultValues: {
       name: '',
       category: '',
@@ -105,8 +120,22 @@ export function EventForm({ competitionId, onEventCreated }: EventFormProps) {
     setIsSubmitting(true)
     
     try {
+      // Transform form data to proper types
+      const transformedData: EventData = {
+        name: data.name,
+        category: data.category,
+        ageGroup: data.ageGroup,
+        level: data.level,
+        entryFee: parseFloat(data.entryFee),
+        maxEntries: data.maxEntries ? parseInt(data.maxEntries) : undefined,
+        description: data.description,
+        requirements: data.requirements,
+        startTime: data.startTime,
+        endTime: data.endTime,
+      }
+
       const eventData = {
-        ...data,
+        ...transformedData,
         competitionId
       }
 
