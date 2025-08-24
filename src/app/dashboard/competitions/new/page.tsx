@@ -50,7 +50,7 @@ const settingsSchema = z.object({
 
 // Form input types (before transformation)
 const settingsFormSchema = z.object({
-  status: z.enum(['DRAFT', 'PUBLISHED']).default('DRAFT'),
+  status: z.enum(['DRAFT', 'PUBLISHED']),
   entryFee: z.string(),
   maxEntries: z.string().optional(),
 })
